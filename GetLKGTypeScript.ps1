@@ -1,12 +1,11 @@
 #Usage:
 # Powershell GetLKGTypeScript.ps1
-
 # No parameters checks the default download location, refreshes from Codeplex, and lists latest commits on $desiredBranch branch (typically develop).
-# -install #######  will build and install the specified version of TypeScript from the $desiredBranch branch (####### represents the Git commit hash)
+# use #######  will build and install the specified version of TypeScript from the $desiredBranch branch (####### represents the Git commit hash)
 # Note that you can also say -install HEAD and it will install whatever the latest is, or HEAD~n where n is the integer number of
 # commits behind the HEAD you want to install (so HEAD~1 is the commit before the latest).
+# This script requires that node.js and git are available in the PATH.  It also requires ~2 GB free for the TypeScript repo clone.
 
-  
 $analyzeCommitCount = 20;
 $desiredBranch = "develop";
 $typeScriptRepoParent = ([Environment]::GetFolderPath('MyDocuments').ToString());
