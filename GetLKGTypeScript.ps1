@@ -181,8 +181,9 @@ function FindGitOrDie([boolean] $silent=$false) {
     }
   } catch [Exception] {
     if ($silent -eq $false) {
-      write-host "ERROR: Git.exe not found on path. You can download from http://msysgit.github.io/" -foregroundcolor "red";
-      write-host "Be sure to select the install option that adds git to the path, or add manually." -foregroundcolor "red";
+      write-host "ERROR: Git.exe not found on path. Download from http://msysgit.github.io/" -foregroundcolor "red";
+      write-host "Select the install option that adds git to the path, or add manually." -foregroundcolor "red";
+      write-host "You may have to close this command window for the PATH to update." -foregroundcolor "red";
     }
     Exit;
   }
@@ -197,6 +198,7 @@ function FindNodeOrDie([boolean] $silent=$false) {
   } catch [Exception] {
     if ($silent -eq $false) {
       write-host "ERROR: Node.exe not found on path. You can download from http://nodejs.org" -foregroundcolor "red";
+      write-host "You may have to close this command window for the PATH to update." -foregroundcolor "red";
     }
     Exit;
   }
@@ -281,42 +283,48 @@ Function Show-Help-And-Quit() {
   EXIT;
 }
 
+Function Show-Introduction-And-Quit() {
+  write-host "Welcome to the TypeScript ""Canary"" Tool.";
+  write-host "";
+  write-host "This PowerShell script will fetch the latest TypeScript code from Codeplex";
+  write-host " and can update the code used by Visual Studio 2012 and 2013 if you have";
+  write-host " them installed.";
+  write-host "";
+  write-host "Before using this script, please be aware that it will download the entire";
+  write-host " Git repo for TypeScript (approximately 1.8 GB as of October 2013) to your";
+  write-host " ""MyDocuments"" folder.  This will be downloaded once and refreshed using";
+  write-host " a delta from then on.";
+  write-host "";
+  write-host "If you want to change the default location, edit the typeScriptRepoParent";
+  write-host " variable at the top of the script.";
+  write-host "";
+  write-host "Lastly, you need to have Git and Node.js installed and in your %PATH% for";
+  write-host " this script to work.  Visit http://msysgit.github.io/ and ";
+  write-host " http://nodejs.org to download.";
+  write-host "";
+  $z = FindNodeOrDie;
+  $z = FindGitOrDie;
+  write-host "You're ready to begin.  Run Powershell .\GetLKGTypeScript.ps1 getstarted" -foregroundcolor "green";
+  write-host "";
+  Exit;
+}
+
 Function Parse-Command-Line($TheArgs) {
   write-host "TypeScript ""Canary"" Tool - by Steve Ognibene (@NYCDotNet) v0.0.1" -foregroundcolor "yellow";
   if($TheArgs.length -eq 0) {
     if (TypeScript-Repo-Exists) {
       Set-Variable -Name desiredAction -Value "fetch;list" -Scope 1
     } else {
-      if ($TheArgs[0] -eq "getstarted") {
+      Show-Introduction-And-Quit;
+    }
+  } ElseIf ($TheArgs.length -eq 1) {
+    if ($TheArgs[0] -eq "getstarted") {
         $z = FindNodeOrDie;
         $z = FindGitOrDie;
         Set-Variable -Name desiredAction -Value "fetch;list" -Scope 1
       } else {
-        write-host "Welcome to the TypeScript ""Canary"" Tool.";
-        write-host "";
-        write-host "This PowerShell script will fetch the latest TypeScript code from Codeplex";
-        write-host " and can update the code used by Visual Studio 2012 and 2013 if you have";
-        write-host " them installed.";
-        write-host "";
-        write-host "Before using this script, please be aware that it will download the entire";
-        write-host " Git repo for TypeScript (approximately 1.8 GB as of October 2013) to your";
-        write-host " ""MyDocuments"" folder.  This will be downloaded once and refreshed using";
-        write-host " a delta from then on.";
-        write-host "";
-        write-host "If you want to change the default location, edit the typeScriptRepoParent";
-        write-host " variable at the top of the script.";
-        write-host "";
-        write-host "Lastly, you need to have Git and Node.js installed and in your %PATH% for";
-        write-host " this script to work.  Visit http://msysgit.github.io/ and ";
-        write-host " http://nodejs.org to download.";
-        write-host "";
-        $z = FindNodeOrDie;
-        $z = FindGitOrDie;
-        write-host "You're ready to begin.  Run Powershell .\GetLKGTypeScript.ps1 getstarted" -foregroundcolor "green";
-        write-host "";
-        Exit;
+        Show-Introduction-And-Quit;
       }
-    }
   } ElseIf ($TheArgs.length -eq 2) {
    if ($TheArgs[0] -eq "use") {
      Set-Variable -Name desiredAction -Value "use" -Scope 1
