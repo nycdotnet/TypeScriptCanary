@@ -242,7 +242,7 @@ function global:GitCheckin ([string] $_hash="")
 }
 
 
-Function Find-Path($Path, [switch]$All=$false, [Microsoft.PowerShell.Commands.TestPathType]$type="Any") {
+Function Find-Path($Path, [switch]$All=$false, $type="Any") {
 #thanks to Joel Bennett | http://huddledmasses.org/powershell-find-path/
     if($(Test-Path $Path -Type $type)) {
        return $path
