@@ -1,3 +1,4 @@
+
 #Usage:
 # Powershell GetLKGTypeScript.ps1
 # No parameters checks the default download location, refreshes from Codeplex, and lists latest commits on $desiredBranch branch (typically develop).
@@ -24,7 +25,7 @@ Function Canary-Main() {
     
     if ($desiredAction.IndexOf("fetch") -ge 0) {
       write-host "Fetching latest TypeScript updates from CodePlex..."  -foregroundcolor "white";
-      $fetchResult = git fetch https://git01.codeplex.com/typescript
+      $fetchResult = git fetch origin
     }
   } else {
     write-host "$typeScriptRepoFolderName folder not found."
@@ -43,6 +44,8 @@ Function Canary-Main() {
   }
   
   $gitCheckoutResult = git checkout $desiredBranch
+  $gitPullResult = git merge origin/$desiredBranch
+  
   $indexOfLKG = -1;
   
   if ($desiredAction.IndexOf("list") -ge 0) {
@@ -69,6 +72,9 @@ Function Canary-Main() {
     if ($desiredCommit -eq "LKG") {
       $desiredCommit = Hash-Of-Last-Known-Good;
     }
+    
+    #todo: check to see if the desired commit is already checked-out.
+    
     write-host "Checking out commit $desiredCommit  (this may take a few minutes - all work is local.)" -foregroundcolor "white";
     $checkoutResult = git checkout $desiredCommit .
     Get-Jake-If-Not-Installed;
@@ -106,39 +112,66 @@ function Backup-Existing-TypeScript-Files() {
   $backupFolder = "..\backupTypeScriptFiles\$timestampFolderName";
   mkdir $backupFolder | Out-Null;
   $ProgFilesX86 = ([Environment]::GetFolderPath('ProgramFilesX86').ToString());
-  Copy-File-If-Source-Exists "$ProgFilesX86\Microsoft SDKs\TypeScript\lib.d.ts" "$backupFolder\SDKs_lib.d.ts"
-  Copy-File-If-Source-Exists "$ProgFilesX86\Microsoft SDKs\TypeScript\tsc.js" "$backupFolder\SDKs_tsc.js"
-  Copy-File-If-Source-Exists "$ProgFilesX86\Microsoft SDKs\TypeScript\typescript.js" "$backupFolder\SDKs_typescript.js"
-  Copy-File-If-Source-Exists "$ProgFilesX86\Microsoft Visual Studio 12.0\Common7\IDE\CommonExtensions\Microsoft\TypeScript\lib.d.ts" "$backupFolder\VS12_lib.d.ts"
-  Copy-File-If-Source-Exists "$ProgFilesX86\Microsoft Visual Studio 12.0\Common7\IDE\CommonExtensions\Microsoft\TypeScript\typescriptServices.js" "$backupFolder\VS12_typescriptServices.js"
-  Copy-File-If-Source-Exists "$ProgFilesX86\Microsoft Visual Studio 12.0\Common7\IDE\VWDExpressExtensions\Microsoft\TypeScript\lib.d.ts" "$backupFolder\VS12WebDevExpress_lib.d.ts"
-  Copy-File-If-Source-Exists "$ProgFilesX86\Microsoft Visual Studio 12.0\Common7\IDE\VWDExpressExtensions\Microsoft\TypeScript\typescriptServices.js" "$backupFolder\VS12WebDevExpress_typescriptServices.js"
-  Copy-File-If-Source-Exists "$ProgFilesX86\Microsoft Visual Studio 11.0\Common7\IDE\CommonExtensions\Microsoft\TypeScript\lib.d.ts" "$backupFolder\VS11_lib.d.ts"
-  Copy-File-If-Source-Exists "$ProgFilesX86\Microsoft Visual Studio 11.0\Common7\IDE\CommonExtensions\Microsoft\TypeScript\typescriptServices.js" "$backupFolder\VS11_typescriptServices.js"
-  Copy-File-If-Source-Exists "$ProgFilesX86\Microsoft Visual Studio 11.0\Common7\IDE\VWDExpressExtensions\Microsoft\TypeScript\lib.d.ts" "$backupFolder\VS11WebDevExpress_lib.d.ts"
-  Copy-File-If-Source-Exists "$ProgFilesX86\Microsoft Visual Studio 11.0\Common7\IDE\VWDExpressExtensions\Microsoft\TypeScript\typescriptServices.js" "$backupFolder\VS11WebDevExpress_typescriptServices.js"
+  $DestinationAndSource =  ("$ProgFilesX86\Microsoft SDKs\TypeScript\lib.d.ts","$backupFolder\SDKs_lib.d.ts"), `
+  ("$ProgFilesX86\Microsoft SDKs\TypeScript\tsc.js","$backupFolder\SDKs_tsc.js"), `
+  ("$ProgFilesX86\Microsoft SDKs\TypeScript\typescript.js","$backupFolder\SDKs_typescript.js"), `
+  ("$ProgFilesX86\Microsoft Visual Studio 12.0\Common7\IDE\CommonExtensions\Microsoft\TypeScript\lib.d.ts","$backupFolder\VS12_lib.d.ts"), `
+  ("$ProgFilesX86\Microsoft Visual Studio 12.0\Common7\IDE\CommonExtensions\Microsoft\TypeScript\typescriptServices.js","$backupFolder\VS12_typescriptServices.js"), `
+  ("$ProgFilesX86\Microsoft Visual Studio 12.0\Common7\IDE\VWDExpressExtensions\Microsoft\TypeScript\lib.d.ts","$backupFolder\VS12WebDevExpress_lib.d.ts"), `
+  ("$ProgFilesX86\Microsoft Visual Studio 12.0\Common7\IDE\VWDExpressExtensions\Microsoft\TypeScript\typescriptServices.js","$backupFolder\VS12WebDevExpress_typescriptServices.js"), `
+  ("$ProgFilesX86\Microsoft Visual Studio 11.0\Common7\IDE\CommonExtensions\Microsoft\TypeScript\lib.d.ts","$backupFolder\VS11_lib.d.ts"), `
+  ("$ProgFilesX86\Microsoft Visual Studio 11.0\Common7\IDE\CommonExtensions\Microsoft\TypeScript\typescriptServices.js","$backupFolder\VS11_typescriptServices.js"), `
+  ("$ProgFilesX86\Microsoft Visual Studio 11.0\Common7\IDE\VWDExpressExtensions\Microsoft\TypeScript\lib.d.ts","$backupFolder\VS11WebDevExpress_lib.d.ts"), `
+  ("$ProgFilesX86\Microsoft Visual Studio 11.0\Common7\IDE\VWDExpressExtensions\Microsoft\TypeScript\typescriptServices.js","$backupFolder\VS11WebDevExpress_typescriptServices.js"); `
+
+  $backupBatchFileText = "@ECHO OFF & CLS & ECHO.`r`n" + `
+    "REM This batch file will restore the files backed up in the current folder.`r`n`r`n" + `
+    "REM This code ensures that the batch is running with admin rights.`r`n" + `
+    "REM see http://stackoverflow.com/questions/7044985/how-can-i-auto-elevate-my-batch-file-so-that-it-requests-from-uac-admin-rights/12264592#12264592`r`n" + `
+    "NET FILE 1>NUL 2>NUL & IF ERRORLEVEL 1 (ECHO You must right-click and select `"Run as administrator`" to run this script.& ECHO Exiting... & ECHO. & PAUSE & EXIT /D)`r`n`r`n" + `
+    "REM ... proceed here with admin rights ...`r`n`r`n";
+
+  $DestinationAndSource | ForEach-Object {
+    if (Copy-File-If-Source-Exists $_[0] $_[1] -eq $true) {
+      $restoreSource = $_[1].Replace("$backupFolder\","");
+      $restoreDestination = $_[0];
+      $backupBatchFileText = "$backupBatchFileText`r`nCOPY `"$restoreSource`" `"$restoreDestination`"";
+    }
+  }
+  $backupBatchFileText | Out-File $backupFolder\RestoreTheseFiles.bat -Encoding Default
 }
 
 function Update-Typescript() {
+  
   $ProgFilesX86 = ([Environment]::GetFolderPath('ProgramFilesX86').ToString());
-  Copy-File-If-Destination-Exists ".\built\local\lib.d.ts" "$ProgFilesX86\Microsoft SDKs\TypeScript\lib.d.ts"
-  Copy-File-If-Destination-Exists ".\built\local\tsc.js" "$ProgFilesX86\Microsoft SDKs\TypeScript\tsc.js"
-  Copy-File-If-Destination-Exists ".\built\local\typescript.js" "$ProgFilesX86\Microsoft SDKs\TypeScript\typescript.js"
-  Copy-File-If-Destination-Exists ".\built\local\lib.d.ts" "$ProgFilesX86\Microsoft Visual Studio 12.0\Common7\IDE\CommonExtensions\Microsoft\TypeScript\lib.d.ts"
-  Copy-File-If-Destination-Exists ".\built\local\typescriptServices.js" "$ProgFilesX86\Microsoft Visual Studio 12.0\Common7\IDE\CommonExtensions\Microsoft\TypeScript\typescriptServices.js"
-  Copy-File-If-Destination-Exists ".\built\local\lib.d.ts" "$ProgFilesX86\Microsoft Visual Studio 12.0\Common7\IDE\VWDExpressExtensions\Microsoft\TypeScript\lib.d.ts"
-  Copy-File-If-Destination-Exists ".\built\local\typescriptServices.js" "$ProgFilesX86\Microsoft Visual Studio 12.0\Common7\IDE\VWDExpressExtensions\Microsoft\TypeScript\typescriptServices.js"
-  Copy-File-If-Destination-Exists ".\built\local\lib.d.ts" "$ProgFilesX86\Microsoft Visual Studio 11.0\Common7\IDE\CommonExtensions\Microsoft\TypeScript\lib.d.ts"
-  Copy-File-If-Destination-Exists ".\built\local\typescriptServices.js" "$ProgFilesX86\Microsoft Visual Studio 11.0\Common7\IDE\CommonExtensions\Microsoft\TypeScript\typescriptServices.js"
-  Copy-File-If-Destination-Exists ".\built\local\lib.d.ts" "$ProgFilesX86\Microsoft Visual Studio 11.0\Common7\IDE\VWDExpressExtensions\Microsoft\TypeScript\lib.d.ts"
-  Copy-File-If-Destination-Exists ".\built\local\typescriptServices.js" "$ProgFilesX86\Microsoft Visual Studio 11.0\Common7\IDE\VWDExpressExtensions\Microsoft\TypeScript\typescriptServices.js"
+  $SourceAndDestination = (".\built\local\lib.d.ts","$ProgFilesX86\Microsoft SDKs\TypeScript\lib.d.ts"), `
+    (".\built\local\tsc.js","$ProgFilesX86\Microsoft SDKs\TypeScript\tsc.js"), `
+    (".\built\local\typescript.js","$ProgFilesX86\Microsoft SDKs\TypeScript\typescript.js"), `
+    (".\built\local\lib.d.ts","$ProgFilesX86\Microsoft Visual Studio 12.0\Common7\IDE\CommonExtensions\Microsoft\TypeScript\lib.d.ts"), `
+    (".\built\local\typescriptServices.js","$ProgFilesX86\Microsoft Visual Studio 12.0\Common7\IDE\CommonExtensions\Microsoft\TypeScript\typescriptServices.js"), `
+    (".\built\local\lib.d.ts","$ProgFilesX86\Microsoft Visual Studio 12.0\Common7\IDE\VWDExpressExtensions\Microsoft\TypeScript\lib.d.ts"), `
+    (".\built\local\typescriptServices.js","$ProgFilesX86\Microsoft Visual Studio 12.0\Common7\IDE\VWDExpressExtensions\Microsoft\TypeScript\typescriptServices.js"), `
+    (".\built\local\lib.d.ts","$ProgFilesX86\Microsoft Visual Studio 11.0\Common7\IDE\CommonExtensions\Microsoft\TypeScript\lib.d.ts"), `
+    (".\built\local\typescriptServices.js","$ProgFilesX86\Microsoft Visual Studio 11.0\Common7\IDE\CommonExtensions\Microsoft\TypeScript\typescriptServices.js"), `
+    (".\built\local\lib.d.ts","$ProgFilesX86\Microsoft Visual Studio 11.0\Common7\IDE\VWDExpressExtensions\Microsoft\TypeScript\lib.d.ts"), `
+    (".\built\local\typescriptServices.js","$ProgFilesX86\Microsoft Visual Studio 11.0\Common7\IDE\VWDExpressExtensions\Microsoft\TypeScript\typescriptServices.js");
+    
+    $SourceAndDestination | ForEach-Object {
+      Copy-File-If-Destination-Exists $_[0] $_[1] | Out-Null;
+    }
 }
 
 function Copy-File-If-Source-Exists([string] $CheckForThisFile, [string] $CopyItToThisFileName) {
   $found = Test-Path $CheckForThisFile;
   if ($found) {
-    Copy-Item -Path $CheckForThisFile -Destination $CopyItToThisFileName;
+    try {
+      Copy-Item -Path $CheckForThisFile -Destination $CopyItToThisFileName;
+      return $true;
+    } catch [Exception] {
+      write-host "Failed while backing up existing TypeScript file." -foregroundcolor "white";
+    }
   }
+  return $false;
 }
 
 function Copy-File-If-Destination-Exists([string] $OverwriteDestinationFileWithThis, [string] $CheckForThisDestinationFile) {
@@ -146,10 +179,12 @@ function Copy-File-If-Destination-Exists([string] $OverwriteDestinationFileWithT
   if ($found) {
     try {
       Copy-Item -Path $OverwriteDestinationFileWithThis -Destination $CheckForThisDestinationFile -Force;
+      return $true;
     } catch [Exception] {
       write-host "Are you running this with admin rights?" -foregroundcolor "white";
     }
   }
+  return $false;
 }
 
 
@@ -278,6 +313,8 @@ Function Show-Help-And-Quit() {
   write-host " count of check-ins in the past to use (so HEAD~2 is the parent of the parent of";
   write-host " the current check-in) or LKG which uses the last check-in that the TypeScript";
   write-host " team included the string ""LKG"" in the commit message.";
+  write-host " You must be running as an admin to successfully update TypeScript because";
+  write-host " the files all live under Program Files.";
   write-host "";
   EXIT;
 }
@@ -309,7 +346,7 @@ Function Show-Introduction-And-Quit() {
 }
 
 Function Parse-Command-Line($TheArgs) {
-  write-host "TypeScript ""Canary"" Tool - by Steve Ognibene (@NYCDotNet) v0.0.1" -foregroundcolor "yellow";
+  write-host "TypeScript ""Canary"" Tool - by Steve Ognibene (@NYCDotNet) v0.0.2" -foregroundcolor "yellow";
   if($TheArgs.length -eq 0) {
     if (TypeScript-Repo-Exists) {
       Set-Variable -Name desiredAction -Value "fetch;list" -Scope 1
@@ -326,6 +363,12 @@ Function Parse-Command-Line($TheArgs) {
       }
   } ElseIf ($TheArgs.length -eq 2) {
    if ($TheArgs[0] -eq "use") {
+     if (-NOT ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator))  
+     {
+       write-host "You have to run this as an admin if you want to do that because the script" -foregroundcolor "red";
+       write-host " needs to update TypeScript source files under Program Files.  Sorry!" -foregroundcolor "red";
+       Exit;
+     }
      Set-Variable -Name desiredAction -Value "use" -Scope 1
      Set-Variable -Name desiredCommit -Value $TheArgs[1] -Scope 1
    } Else {
