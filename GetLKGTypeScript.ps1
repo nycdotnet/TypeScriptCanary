@@ -1,4 +1,3 @@
-
 #Usage:
 # Powershell GetLKGTypeScript.ps1
 # No parameters checks the default download location, refreshes from Codeplex, and lists latest commits on $desiredBranch branch (typically develop).
@@ -14,8 +13,10 @@ $typeScriptRepoFolderName = "TypeScriptSourceCode";
 
 
 Function Canary-Main() {
-  $nodeExePath = FindNodeOrDie;
-  $gitExePath = FindGitOrDie;
+  if ($desiredAction.IndexOf("getstarted") -eq -1) {
+    $nodeExePath = FindNodeOrDie;
+    $gitExePath = FindGitOrDie;
+  }
   
   pushd $typeScriptRepoParent;
   $TSFolderFound = Test-Path ".\TypeScriptSourceCode";
@@ -30,7 +31,7 @@ Function Canary-Main() {
   } else {
     write-host "$typeScriptRepoFolderName folder not found."
     if ($desiredAction.IndexOf("fetch") -ge 0) {
-      write-host "Creating it..."  -foregroundcolor "white";
+      write-host "Creating the TypeScriptSourceCode folder..."  -foregroundcolor "white";
       mkdir $typeScriptRepoFolderName | out-null;
       pushd $typeScriptRepoFolderName;
       write-host "Cloning TypeScript repository - this could take several minutes."  -foregroundcolor "white";
@@ -43,7 +44,9 @@ Function Canary-Main() {
     pushd $typeScriptRepoFolderName\typescript;
   }
   
+  write-host "Checking out $desiredBranch, resetting changes, and merging from origin..."  -foregroundcolor "white";
   $gitCheckoutResult = git checkout $desiredBranch
+  $gitReset = git reset --hard HEAD
   $gitPullResult = git merge origin/$desiredBranch
   
   $indexOfLKG = -1;
@@ -72,15 +75,18 @@ Function Canary-Main() {
     if ($desiredCommit -eq "LKG") {
       $desiredCommit = Hash-Of-Last-Known-Good;
     }
+    #todo: get hash of HEAD or HEAD~n, if specified.
     
     #todo: check to see if the desired commit is already checked-out.
     
-    write-host "Checking out commit $desiredCommit  (this may take a few minutes - all work is local.)" -foregroundcolor "white";
+    write-host "Checking out commit $desiredCommit (this may take a few minutes - all work is local.)" -foregroundcolor "white";
     $checkoutResult = git checkout $desiredCommit .
     Get-Jake-If-Not-Installed;
     Build-TypeScript;
+    #todo: handle build failure if needed.
     Backup-Existing-TypeScript-Files;
     Update-TypeScript;
+    #todo: use the commit hash here instead of HEAD~n if present
     write-host "TypeScript has been updated to commit $desiredCommit of the $desiredBranch branch." -foregroundcolor "green";
   }
   
@@ -104,6 +110,7 @@ function Build-TypeScript() {
   $jakeClean = jake clean
   write-host "Building TypeScript...";
   $jakeLocal = jake local
+  #todo: return success or fail of build (for example, 46cfa2c does not build correctly.)
 }
 
 function Backup-Existing-TypeScript-Files() {
@@ -320,7 +327,8 @@ Function Show-Help-And-Quit() {
 }
 
 Function Show-Introduction-And-Quit() {
-  write-host "Welcome to the TypeScript ""Canary"" Tool.";
+  write-host "";
+  write-host "Welcome to the TypeScript ""Canary"" Tool!" -foregroundcolor "white";
   write-host "";
   write-host "This PowerShell script will fetch the latest TypeScript code from Codeplex";
   write-host " and can update the code used by Visual Studio 2012 and 2013 if you have";
@@ -328,10 +336,15 @@ Function Show-Introduction-And-Quit() {
   write-host "";
   write-host "Before using this script, please be aware that it will download the entire";
   write-host " Git repo for TypeScript (approximately 1.8 GB as of October 2013) to your";
-  write-host " ""MyDocuments"" folder.  This will be downloaded once and refreshed using";
+  write-host " ""My Documents"" folder.  This will be downloaded once and refreshed using";
   write-host " a delta from then on.";
   write-host "";
-  write-host "If you want to change the default location, edit the typeScriptRepoParent";
+  write-host "This script is not appropriate for people who are actually working on the";
+  write-host " TypeScript compiler itself as it will overwrite any changes in the develop";
+  write-host " branch without asking or stashing.  It is meant for TypeScript devs who";
+  write-host " just want a convenient way to track and try the latest bits from CodePlex.";
+  write-host "";
+  write-host "If you want to change the default repo path, edit the `$typeScriptRepoParent";
   write-host " variable at the top of the script.";
   write-host "";
   write-host "Lastly, you need to have Git and Node.js installed and in your %PATH% for";
@@ -340,13 +353,15 @@ Function Show-Introduction-And-Quit() {
   write-host "";
   $z = FindNodeOrDie;
   $z = FindGitOrDie;
-  write-host "You're ready to begin.  Run Powershell .\GetLKGTypeScript.ps1 getstarted" -foregroundcolor "green";
+  write-host "";
+  write-host "You're ready to begin!  Run Powershell .\GetLKGTypeScript.ps1 getstarted" -foregroundcolor "green";
   write-host "";
   Exit;
 }
 
 Function Parse-Command-Line($TheArgs) {
-  write-host "TypeScript ""Canary"" Tool - by Steve Ognibene (@NYCDotNet) v0.0.2" -foregroundcolor "yellow";
+  write-host "TypeScript ""Canary"" Tool - by Steve Ognibene (@NYCDotNet) v0.0.3" -foregroundcolor "yellow";
+  write-host "Visit https://github.com/nycdotnet/typescriptcanary for the latest version.";
   if($TheArgs.length -eq 0) {
     if (TypeScript-Repo-Exists) {
       Set-Variable -Name desiredAction -Value "fetch;list" -Scope 1
@@ -357,7 +372,7 @@ Function Parse-Command-Line($TheArgs) {
     if ($TheArgs[0] -eq "getstarted") {
         $z = FindNodeOrDie;
         $z = FindGitOrDie;
-        Set-Variable -Name desiredAction -Value "fetch;list" -Scope 1
+        Set-Variable -Name desiredAction -Value "fetch;list;getstarted" -Scope 1
       } else {
         Show-Introduction-And-Quit;
       }
