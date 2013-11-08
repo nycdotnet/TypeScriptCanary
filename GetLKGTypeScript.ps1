@@ -6,7 +6,8 @@
 # commits behind the HEAD you want to install (so HEAD~1 is the commit before the latest).
 # This script requires that node.js and git are available in the PATH.  It also requires ~2 GB free for the TypeScript repo clone.
 
-$analyzeCommitCount = 20;
+#todo: add count command-line parameter.
+$analyzeCommitCount = 30;
 $desiredBranch = "develop";
 $typeScriptRepoParent = ([Environment]::GetFolderPath('MyDocuments').ToString());
 $typeScriptRepoFolderName = "TypeScriptSourceCode";
@@ -82,8 +83,15 @@ Function Canary-Main() {
     write-host "Checking out commit $desiredCommit (this may take a few minutes - all work is local.)" -foregroundcolor "white";
     $checkoutResult = git checkout $desiredCommit .
     Get-Jake-If-Not-Installed;
-    Build-TypeScript;
-    #todo: handle build failure if needed.
+    $BuildSuccess = Build-TypeScript;
+    
+    if (!$BuildSuccess) {
+      write-host "TypeScript build error encountered.  Please try a different commit." -foregroundcolor "red";
+      write-host "If you are stuck, try to restore a previous version by running the" -foregroundcolor "red";
+      write-host " batch file in one of the backup folders." -foregroundcolor "red";
+      Exit
+    }
+    
     Backup-Existing-TypeScript-Files;
     Update-TypeScript;
     #todo: use the commit hash here instead of HEAD~n if present
@@ -109,9 +117,16 @@ function Build-TypeScript() {
   write-host "Removing previously built TypeScript (if any)...";
   $jakeClean = jake clean
   write-host "Building TypeScript...";
-  $jakeLocal = jake local
-  #todo: return success or fail of build (for example, 46cfa2c does not build correctly.)
+  $jakeLocal = jake local 2>&1
+  $jlrs = [string]::join("`r`n",$jakeLocal)
+  
+  if (($jlrs.IndexOf("jake aborted") -eq -1) -and ($jlrs.IndexOf("error TS") -eq -1) -and ($jlrs.IndexOf("Error: ") -eq -1) -and ($jlrs.IndexOf("unsuccessful") -eq -1)) {
+    return $true;
+  } else {
+    return $false;
+  }
 }
+
 
 function Backup-Existing-TypeScript-Files() {
   write-host "Backing up files to $typeScriptRepoFolderName\backupTypeScriptFiles";
@@ -360,7 +375,7 @@ Function Show-Introduction-And-Quit() {
 }
 
 Function Parse-Command-Line($TheArgs) {
-  write-host "TypeScript ""Canary"" Tool - by Steve Ognibene (@NYCDotNet) v0.0.3" -foregroundcolor "yellow";
+  write-host "TypeScript ""Canary"" Tool - by Steve Ognibene (@NYCDotNet) v0.0.4" -foregroundcolor "yellow";
   write-host "Visit https://github.com/nycdotnet/typescriptcanary for the latest version.";
   if($TheArgs.length -eq 0) {
     if (TypeScript-Repo-Exists) {
